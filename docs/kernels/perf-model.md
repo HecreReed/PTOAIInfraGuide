@@ -1,41 +1,60 @@
-# 性能模型与调优流程
+# 性能模型与调优流程（深度）
 
-## 阶段流水线模型
+## 1. 阶段流水线模型
 
-多数高性能 kernel：
+几乎所有高性能 kernel 都是：
 
 ```text
-TLOAD → (layout transform) → COMPUTE(CUBE/VEC) → TSTORE
+TLOAD → Transform(TEXTRACT/TMOV/…) → COMPUTE(CUBE|VEC) → TSTORE
 ```
 
-优化目标：
+优化三目标：
 
-1. 最大化阶段重叠  
-2. 提高算术强度（每字节搬运对应更多 FLOP）  
-3. 消灭不必要同步气泡  
+1. **重叠** load/transform/compute/store  
+2. **提高算术强度**（FLOP/Byte）  
+3. **消灭虚假依赖**  
 
-## Bound 直觉
+## 2. Bound 语言
 
-| Profiler 画像 | 含义 | 方向 |
-|---------------|------|------|
-| TLOAD 接近打满 | feed-limited | 减流量、加复用、双缓冲 |
-| Transform 占比高 | 布局税 | 选对初始 layout |
-| TMATMUL 很低 | Cube 挨饿 | 重叠、tile、带宽 |
-| VEC 很长 | epilogue 重 | 融合、算法简化、专用指令 |
+| 画像 | 解释 | 优先动作 |
+|------|------|----------|
+| TLOAD→100% | 供给极限 | 减流量、stepK、复用、重叠 |
+| TEXTRACT 高 | 布局/提取税 | 改 base tile、减 extract、重叠 |
+| TMATMUL 低 | Cube 饿或气泡 | 查依赖与供给 |
+| VEC 长 | epilogue 重 | 融合、算法、专用指令 |
+| AICPU 忙核闲 | 调度顶 | 合并 kernel |
 
-## 可重复流程（pto-isa 风格）
+## 3. 可重复实验协议
 
-1. 正确性：CPU-SIM / golden  
-2. 固定 shape set  
-3. 定位阶段  
-4. **一次只改一个杠杆**（tiling / 核划分 / 重叠）  
-5. 记录表格，防止「玄学回退」  
+1. 固定平台与 CANN/驱动版本  
+2. 固定 shape 集合（小/中/大）  
+3. warm-up + 多次计时  
+4. **一次只改一个旋钮**  
+5. 同步记录精度  
+6. 表格入库（README/CI）  
 
-## 两级调优（pypto-lib 风格）
+## 4. 两级调优（框架场景）
 
-| 级别 | 看什么 | 典型动作 |
-|------|--------|----------|
-| L2 | 核间 swimlane | 合并 pl.at、parallel、增大 kernel |
-| L1/L0 | 核内流水与 PMU | tile 填满 buffer、双缓冲、指令序 |
+### L2 核间
 
-先 L2 后 L1：内核再快，若 AICPU 喂不进核，也白搭。
+工具：`--enable-l2-swimlane` → Perfetto  
+动作：parallel、合并 at、spmd、增大 kernel 粒度  
+
+### L1/L0 核内
+
+工具：msprof、PMU、kernel insight  
+动作：tile、双缓冲、指令序、布局  
+
+**先 L2 后 L1**：内核再快，喂不进去也白搭。
+
+## 5. 与 CUDA Roofline 对照
+
+Roofline 思想完全可迁移：  
+算力墙 vs 带宽墙。  
+达芬奇只是把墙拆成 **CUBE 墙 / VEC 墙 / MTE 墙 / 调度墙**。
+
+## 6. 检验标准
+
+- [ ] 独立解读一张「阶段占比表」  
+- [ ] 写出你自己的实验记录模板  
+- [ ] 说明为何禁止一次改三个参数  

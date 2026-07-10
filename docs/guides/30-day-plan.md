@@ -1,54 +1,67 @@
-# 新人 30 天上手计划
+# 新人 30 天上手计划（详细版）
 
-目标：30 天内从「听说过昇腾」走到「能在 PTO 栈上独立完成一个小算子闭环」。
+目标：30 天从零到 **可复现闭环**（sim 或真机），并选一条主线深入。
 
-## 第 1 周：建立地图
+## 总则
 
-| 天 | 任务 | 产出 |
+- 每天留下笔记：命令、路径、坑、一句话结论  
+- 正确性优先于速度  
+- 周末只做复盘，不堆新概念  
+
+## 第 1 周 · 地图与硬件
+
+| 天 | 任务 | 产出 | 验收 |
+|----|------|------|------|
+| D1 | 读学习路线 + 四仓库 README | 手绘分层图 | 能讲 5 分钟 |
+| D2 | 1C2V + 存储层次 | 两张图 | 默画 |
+| D3 | 装 pto-isa，跑 CPU-SIM | 日志 | 退出码 0 |
+| D4 | Tile 五要素笔记 | 卡片 | 默写 |
+| D5 | gemm/fa demo | 结果截图 | 通过 |
+| D6 | 指令地图 | 分类表 | 6 桶 |
+| D7 | CUDA 对照 | 对照表 | 10 条以上 |
+
+## 第 2 周 · ISA 正确性
+
+| 天 | 任务 | 验收 |
 |----|------|------|
-| D1 | 读本站学习路线 + 四仓库 README | 手绘生态分层图 |
-| D2 | 达芬奇 1C2V 与存储层次 | 一张内存图 + 三条典型数据流 |
-| D3 | 装 pto-isa 依赖，跑 CPU-SIM | `run_cpu.py` 通过 |
-| D4 | 读 Tile / Event 文档 | 笔记：Tile 五要素 |
-| D5 | 跑 GEMM / FA demo（CPU） | 记录命令与结果 |
-| D6 | 浏览 PTO 指令列表 | 自己做分类表 |
-| D7 | 复盘 + CUDA 对照表 | 完成 [CUDA 对照](/guides/cuda-vs-pto) 练习 |
+| D8-9 | Auto Add demo 精读 | 数据流注释 |
+| D10-11 | Manual Event VecAdd | 依赖图 |
+| D12 | 双缓冲理论 | 时间轴草图 |
+| D13-14 | 跟读一个 ST | shape/dtype 列表 |
 
-## 第 2 周：ISA 与正确性
+## 第 3 周 · 二选一深入
 
-| 天 | 任务 | 产出 |
-|----|------|------|
-| D8–9 | 读 demos Auto Mode Add | 解释 Auto 做了什么 |
-| D10–11 | 读 Manual GEMM 结构 | 标出 load/compute/store 阶段 |
-| D12 | 学 Event 双缓冲 | 画 warm-up / steady / drain |
-| D13–14 | 选 1 个小 ST 用例跟读 | 写清 shape 与 dtype 约束 |
+### 选项 B1 编译器
 
-## 第 3 周：编译器与框架二选一
+- 读 IR manual 类型  
+- 跟 lit `.pto`  
+- 跑通一次 ptoas（有环境）或精读生成 C++  
 
-### 选项 B1：PTOAS
+### 选项 B2 框架
 
-- 构建或使用现成 `ptoas` 二进制
-- 用 sample 生成 `.pto` → 插入 sync → 出 C++
-- 读 IR Level-2 `tile_buf` 示例
+- 装 pypto  
+- hello + softmax  
+- coding style 全文批注  
 
-### 选项 B2：PyPTO
-
-- `pip install -e .` 安装 pypto
-- 跑 hello_world / softmax
-- 读 `@pl.jit` 与 `pl.at` 风格文档
-
-## 第 4 周：闭环
+## 第 4 周 · 闭环与展示
 
 | 天 | 任务 |
 |----|------|
-| D22–24 | 在 pypto-lib beginner 目录跑通 simulator |
-| D25–27 | 跟读 intermediate 一个算子 + golden 阈值 |
-| D28–29 | 写一页性能/精度笔记（Bound 假设 + 误差阈值） |
-| D30 | 整理个人知识卡：命令、路径、坑位清单 |
+| D22-24 | pypto-lib beginner→一个 intermediate |
+| D25-27 | 读性能模型 + 做一次小改对比 |
+| D28-29 | 写一页复盘（精度+性能+坑） |
+| D30 | 演示：10 分钟分享 |
 
-## 完成定义（Definition of Done）
+## Definition of Done
 
-- [ ] 能向同事 10 分钟讲清四仓库分工  
-- [ ] CPU-SIM 或 sim 平台至少一条端到端命令可复现  
-- [ ] 能指出自己 demo 里最可能的瓶颈阶段  
-- [ ] 知道下一步该深挖 ISA / 编译器 / 框架哪条线  
+- [ ] 四仓库边界能讲清  
+- [ ] 至少一条端到端命令可复现  
+- [ ] 有个人笔记库  
+- [ ] 选定 A/B/C 主线下一季度目标  
+
+## 卡关时
+
+1. 回 SIM  
+2. 减小 shape  
+3. 分层日志  
+4. 开 Issue 附版本与复现  

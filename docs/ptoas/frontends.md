@@ -1,33 +1,39 @@
-# PTODSL / TileLang-DSL 前端
+# PTODSL / TileLang-DSL 前端（深度）
 
-PTOAS 仓库内还承载/对接多种前端实验与产品化路径。
+## 1. 为什么会有多前端
 
-## PTODSL
+同一套 pto-isa 语义，可以有：
 
-- Python 风格构造 PTO 计算  
-- 随 `ptoas` Python 分发包安装（`import ptodsl`）  
-- 定位接近「可 JIT 的 tile 级 DSL」，相对 PyPTO 更底层  
+| 前端 | 风格 | 更像 |
+|------|------|------|
+| 手写 `.pto` | IR | 编译器教材 |
+| PTODSL | Python tile/JIT | CuTile 级 |
+| TileLang-DSL | Tile 语言 | SPMD DSL |
+| PyPTO | Tensor/图 | 框架级 |
 
-对比（社区常见说法）：
+终点都是指令契约；前端差异在 **抽象高度与调度模型**。
 
-| | PyPTO | PTODSL |
-|--|-------|--------|
-| 抽象 | Tensor 友好，整图/MPMD 运行时 | 更贴近 kernel/tile |
-| 执行 | 动态任务图 + simpler | 更偏 kernel/JIT 路径 |
-| 类比 | 框架级 | CuTile / 底层 DSL 级 |
+## 2. PTODSL
 
-## TileLang-DSL
+- 随 ptoas Python 分发：`import ptodsl`  
+- 更贴近 kernel 拼装  
+- 适合研究 pass 与快速试 IR 语义  
 
-- 与 TileLang 生态衔接的语法糖与测试（见仓库 `tilelang-dsl/`）  
-- 目标：让 SPMD tile 语言也能落到 PTO/PTOAS  
+## 3. TileLang 路径
 
-## 选型
+- 仓库 `tilelang-dsl/` + 社区 TileLang Ascend  
+- SPMD tile 程序也可落到 PTO  
 
-| 需求 | 更合适 |
-|------|--------|
-| 整网、融合、调度、模型 | PyPTO + pypto-lib |
-| 研究 pass / 直接玩 IR | 手写 `.pto` + ptoas |
-| Python 快速拼 tile kernel | PTODSL |
-| 已有 TileLang 资产 | TileLang-Ascend / tilelang-dsl 路径 |
+## 4. 选型
 
-前端再多，**语义终点仍是 pto-isa 指令契约**——这是生态一致性的锚点。
+| 需求 | 选择 |
+|------|------|
+| 整网/融合/调度 | PyPTO+lib |
+| 研究编译 | `.pto`+PTOAS |
+| 快速 tile 实验 | PTODSL |
+| 已有 TileLang 资产 | TileLang 路径 |
+
+## 5. 检验标准
+
+- [ ] 一句话区分四前端  
+- [ ] 知道 PTODSL 安装合同依赖 ptoas wheel  

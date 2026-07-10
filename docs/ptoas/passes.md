@@ -1,40 +1,73 @@
-# 优化 Pass 与同步插入
+# 优化 Pass 与同步插入（深度）
 
-## 常见 Pass 家族（概念）
+## 1. Pass 在流水线中的位置
 
-| Pass | 解决什么 | 关闭/降级场景 |
-|------|----------|----------------|
-| InsertSync / 相关同步 | 自动补 pipeline 依赖 | 已是 Level-3 手写同步 |
-| BufID Sync（A5） | 用 buffer 序减少 event 压力 | 非 A5 目标 |
-| PlanMemory | 地址/缓冲规划 | level3 专家路径 |
-| Tile Fusion | 合并 tile 级 op，减往返 | 调试正确性时 |
-| Arch lowering | 面向 a3/a5 差异 | 交叉编译注意 arch 标志 |
-
-CLI 层面常见：
-
-```bash
-ptoas input.pto --enable-insert-sync -o out.cpp
-ptoas input.pto --pto-arch=a5 --enable-bufid_sync -o out.cpp
-ptoas input.pto --pto-level=level3 -o out.cpp   # 偏向保留手工调度
+```text
+Parse/Verify → (规范化) → Fusion? → PlanMemory? → InsertSync/BufID? → Lower/Codegen
 ```
 
-## 为什么同步插入是核心
+具体顺序以版本与 `--pto-level` 为准；**level3 常关闭** PlanMemory/InsertSync。
 
-手写 event 易错且费时；完全不插则错误或过保守。编译器插入策略要在 **正确性** 与 **重叠度** 间折中。
+## 2. 同步插入（InsertSync 家族）
 
-性能回退常见原因：
+### 2.1 要解决的问题
 
-- 插入过粗 → 流水线气泡  
-- 融合边界错误 → 非法依赖或多余拷贝  
-- arch 选错 → 错误同步模型  
+从「仅数据依赖的 op 序列」推出 **跨 pipeline 的 event/flag**。
 
-## 调试建议
+### 2.2 失败模式
 
-1. 先在无优化/少 pass 路径对齐数值  
-2. 逐个打开 pass，对比 `.pto` / 生成 C++ diff  
-3. 对可疑 kernel 保留 `dump` 中间文件（框架侧常有 dump_passes）  
-4. 将「编译器问题」与「算法问题」用 golden 隔开  
+| 模式 | 表现 |
+|------|------|
+| 过稀 | 真机偶发错误 |
+| 过粗 | 正确但吞吐差 |
+| arch 错配 | A5/A3 行为不一致 |
 
-## 和设计文档
+### 2.3 CLI
 
-仓库 `docs/designs/`、`ptoas-tile-fusion-design.md`、`bufid_sync_a5_design.md` 等是进阶读物；贡献 pass 前先读对应 design。
+```bash
+ptoas in.pto --enable-insert-sync -o out.cpp
+ptoas in.pto --pto-arch=a5 --enable-bufid_sync -o out.cpp
+```
+
+## 3. PlanMemory
+
+在合法前提下分配/规划片上地址，使 Manual 式 `TASSIGN` 不再必须由人完成。  
+与 multi-buffer 属性交互：slot 数影响物理扇出。
+
+## 4. Tile Fusion
+
+合并相邻 tile op，减少中间材料化。  
+收益：少访存、少 kernel/段。  
+风险：合法融合边界、精度、寄存器/UB 压力。
+
+设计文档：`ptoas-tile-fusion-design.md`。
+
+## 5. 架构特化
+
+`--pto-arch=a3|a5` 影响：
+
+- 同步模型  
+- 可用指令  
+- 可能的 layout/对齐假设  
+
+## 6. 调试 Pass 的方法
+
+1. 最小 `.pto` 复现  
+2. 关闭可疑 pass 对比  
+3. dump 中间 IR（框架侧 `dump_passes`）  
+4. 将问题分类：verifier / 同步 / 内存 / 后端  
+
+## 7. 与性能的关系
+
+自动同步保证正确是底线；**性能**往往还要：
+
+- 前端少制造碎 op  
+- fusion 抓住 epilogue  
+- 双缓冲显式 multi-buffer  
+- 必要时 level3 手写  
+
+## 8. 检验标准
+
+- [ ] 列举 4 类 Pass 家族  
+- [ ] 说明 level3 的语义  
+- [ ] 给出「怀疑 InsertSync 过粗」时的验证步骤  

@@ -1,31 +1,56 @@
-# Flash Attention 优化
+# Flash Attention 优化（深度）
 
-## 为什么 FA 是「毕业题」
+## 1. 为什么难
 
-- 计算与访存交织  
-- online softmax 数值敏感  
-- 多阶段（QK、softmax、PV）要在片上复用  
-- 序列长度跨数量级，tiling 策略要稳  
+- 算法：online softmax 状态  
+- 系统：多阶段 matmul + vec  
+- 数值：exp/归一对精度敏感  
+- 形状：S 从 1k 到 32k+ 行为剧变  
 
-## 参考资产
+## 2. 算法核心（可迁移自论文）
 
-- pto-isa：`kernels/manual/common/flash_atten/`、`kernels/manual/a5/flash_atten/`  
-- 官方 README 给出 910B2 上相对 `torch_npu` 的加速表示例（随版本变化，以仓库为准）  
+标准 attention 朴素实现物化 \(S\times S\) 矩阵 → HBM 炸。  
+FA 思想：
 
-## 优化要点（PTO 视角）
+- 外层遍历 KV 块  
+- 内层遍历 Q 块  
+- 片上完成 QK→softmax→PV  
+- online 归一避免两遍扫  
 
-1. **按块遍历 KV，复用 Q tile**（经典 FA tiling）  
-2. **online softmax 状态**放在合适的 Vec tile  
-3. **Cube 负责 matmul，Vec 负责 softmax 路径**，中间少 round-trip GM  
-4. **多核切 S 维**时注意负载与尾块 valid  
-5. Decode 与 Prefill 的 Bound 不同，不要共用一套「拍脑袋 tile」  
+HBM 流量从 \(O(S^2)\) 级额外物化降到与序列更友好的量级（精确复杂度以论文为准）。
 
-## 和 CUDA FA 论文对照
+## 3. PTO 落地要点
 
-算法思想可迁移；实现载体变为 Tile 指令 + 达芬奇流水线。读论文建立「为何省 HBM」，读 pto-isa kernel 建立「如何在 UB/L0 上落地」。
+1. **Cube** 负责 QK/PV matmul  
+2. **Vec** 负责 rowmax/exp/rowsum 与状态更新  
+3. 中间态尽量留在 **Vec/Acc tile**，少写 GM  
+4. Event 串起 load 与两阶段计算  
+5. 多核切 S 时处理 **尾块 valid**  
+6. Prefill vs Decode Bound 不同，tile 策略勿雷同  
 
-## 检验
+## 4. 仓库资产
 
-- 白板画出 FA 外层 KV 块、内层 Q 块循环  
-- 指出至少一处必须同步的依赖边  
-- 说明为何长序列下加速比可能收敛  
+- A2/A3：`kernels/manual/common/flash_atten/`  
+- A5：`kernels/manual/a5/flash_atten/`  
+- README 含 vs `torch_npu` 的参考加速表（随版本变化）  
+
+## 5. 读性能表时注意
+
+- 短序列：固定开销与启动占比高，加速比可很大  
+- 长序列：趋近带宽/算法极限，加速比收敛  
+- 务必对照实现是否 FA2/3 思想变体  
+
+## 6. 调试顺序
+
+1. 单 tile row-softmax 正确  
+2. 单头小 S 对齐 torch  
+3. 多 tile online 状态  
+4. 多核  
+5. 再开双缓冲与激进重叠  
+
+## 7. 检验标准
+
+- [ ] 白板画 FA 双层循环  
+- [ ] 指出至少 3 处必须同步的边界  
+- [ ] 说明 online softmax 保的是什么  
+- [ ] 能解释「短序列加速比更大」  

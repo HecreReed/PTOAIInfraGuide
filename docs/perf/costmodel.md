@@ -1,22 +1,24 @@
-# CostModel 性能仿真
+# CostModel 性能仿真（深度）
 
-## 是什么
+## 1. 定位
 
-pto-isa 在演进 **CostModel**：对 PTO 指令序列做性能仿真，便于在没有完整上板或早期探索时估计瓶颈。A5 相关能力在 roadmap 中持续增强。
+在指令序列层做 what-if，补位：
 
-## 为什么需要
-
-| 手段 | 优点 | 限制 |
+| 手段 | 优点 | 缺点 |
 |------|------|------|
-| CPU-SIM | 正确性好 | 非性能模型 |
-| 真机 msprof | 最真实 | 环境贵、迭代慢 |
-| CostModel | 快速 what-if | 模型误差、覆盖度 |
+| CPU-SIM | 正确性 | 非性能 |
+| 真机 | 真实 | 慢、贵 |
+| CostModel | 快迭代 | 模型误差 |
 
-## 使用建议
+## 2. 使用建议
 
-1. 先保证指令序列合法  
-2. 用 CostModel 比较 tiling 方案 A/B  
-3. 短名单再上板确认  
-4. 把误差 case 反馈给模型（若参与社区）  
+1. 合法指令序列  
+2. 对比 tiling A/B  
+3. 短名单上板  
+4. 误差反馈  
 
-具体入口见 pto-isa 文档 `docs/costmodel*` 与测试目录 `tests/costmodel`。
+入口：pto-isa `docs/costmodel*`、`tests/costmodel`。
+
+## 3. 检验标准
+
+- [ ] 说明适用/不适用场景  

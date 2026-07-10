@@ -1,23 +1,13 @@
-# 与 CUDA 生态对照
+# 与 CUDA 生态对照（深度）
 
-更细的术语表见 [CUDA 对照速查](/guides/cuda-vs-pto)。这里给 **生态角色** 对照。
+详见 [CUDA 对照速查](/guides/cuda-vs-pto)。此处强调 **岗位能力映射**：
 
-| CUDA 生态角色 | PTO 生态角色 |
-|---------------|--------------|
-| CUDA Toolkit | CANN + 驱动运行时 |
-| CUDA C++ | pto-isa C++ intrinsics |
-| CUTLASS | pto-isa manual kernels + 模板化实现 |
-| Triton | PyPTO / TileLang-Ascend / PTODSL |
-| nvcc / MLIR 后端 | PTOAS |
-| cuBLAS / cuDNN | 昇腾数学库 + 自定义 PTO kernel |
-| NCCL | HCCL + PTO 通信扩展 |
-| PyTorch CUDA backend | torch_npu +（可选）PyPTO 路径 |
-| vLLM 类推理栈 | 业务推理框架 + pypto-lib 类内核资产 |
-| Nsight | msprof + swimlane + CostModel |
+| CUDA 岗技能 | PTO 岗落点 |
+|-------------|-----------|
+| 手写 CUDA kernel | pto-isa Manual |
+| Triton 专家 | PyPTO/TileLang |
+| 编译器 | PTOAS Pass |
+| 推理引擎 | 业务栈 + pypto-lib |
+| 性能分析 | msprof+swimlane |
 
-## 迁移学习策略
-
-1. **别从重写 FA CUDA kernel 开始**——先跑通 pypto-lib sim。  
-2. **保留你的性能方法论**（roofline、一次一变量、表格回归）。  
-3. **替换你的执行心智**（Tile + pipeline event + MPMD）。  
-4. **重建你的工具肌肉记忆**（命令、日志、产物目录）。  
+迁移策略：保留方法论，替换执行心智与工具肌肉记忆。

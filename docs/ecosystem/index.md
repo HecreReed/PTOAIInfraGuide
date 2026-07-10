@@ -1,9 +1,7 @@
 # CANN 生态 · 模块总览
 
-## 文章
+本模块已按 AIInfraGuide 粒度扩写，建议按下列顺序阅读：
 
-| 文章 | 内容 |
-|------|------|
-| [四仓库协作](./four-repos) | 主依赖关系 |
-| [与 CUDA 生态对照](./cuda-map) | 迁移动线 |
-| [资源索引](./resources) | 链接汇总 |
+- [four-repos](./four-repos)
+- [cuda-map](./cuda-map)
+- [resources](./resources)

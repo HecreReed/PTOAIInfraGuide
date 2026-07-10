@@ -1,52 +1,40 @@
-# 存储层次与 Tile 映射
+# 存储层次与 Tile 映射（深度）
 
-## 层次总览
-
-```text
-GM (Global Memory / HBM)
-        ↕ TLOAD / TSTORE
-MAT (Matrix L1)
-  ├─ LEFT  (L0A)
-  ├─ RIGHT (L0B)
-  ├─ ACC   (L0C)
-  └─ BIAS
-VEC / UB (Unified Buffer)  ← 向量 tile 主战场
-```
-
-## TileType 映射
-
-| TileType | 典型位置 | 用途 |
-|----------|----------|------|
-| `Vec` | UB | 逐元素、归约、softmax 中间态 |
-| `Mat` | Matrix L1 | 通用矩阵暂存 |
-| `Left` | L0A | `TMATMUL` 左矩阵 |
-| `Right` | L0B | `TMATMUL` 右矩阵 |
-| `Acc` | L0C | 累加器 / 矩阵输出 |
-| `Bias` / `Scaling` | 辅助缓冲 | 偏置与缩放路径 |
-
-## 典型 GEMM 数据流
+## 1. 层次与指令
 
 ```text
-GM --TLOAD--> MAT --TMOV/TEXTRACT--> Left/Right
-                                      |
-                                   TMATMUL
-                                      ↓
-                                     Acc --TSTORE--> GM
+GM  ←TLOAD/TSTORE→  MAT(L1)  ←TEXTRACT/TMOV→  L0(Left/Right/Acc)
+                         ↘
+                          VEC/UB（向量主场）
 ```
 
-向量 epilogue（如 bias + activation）常把 Acc 结果转到 `Vec` tile 再写回。
+## 2. TileType 映射表
 
-## 调优含义
+见 [Tile 模型](/pto-isa/tile-model) 完整表。记忆口诀：
 
-1. **容量约束是硬的**：tile 静态 `Rows×Cols` 必须放得下。  
-2. **布局影响引擎效率**：分形/盒化布局服务矩阵引擎偏好。  
-3. **有效区域（valid）**：处理尾块与动态 shape 的关键，未定义区不要假设有值。  
-4. **复用决定算术强度**：同一次 load 参与更多 compute，才能摆脱 MTE Bound。
+- 算元素 → Vec  
+- 进矩阵引擎 → Left/Right/Acc  
+- 在 L1 暂存 → Mat  
 
-## 检验
+## 3. 算术强度直觉
 
-不看文档，回答：
+\[
+I \approx \frac{\text{FLOPs}}{\text{Bytes moved from GM}}
+\]
 
-- Softmax 的中间 exp 更可能在哪个 TileType？  
-- 为什么 double buffer 通常至少需要两套同形 tile？  
-- Acc 上的结果为什么有时不直接 `TSTORE` 而要先 `TMOV`？  
+提高 I：
+
+- 更大复用（stepK、输出复用）  
+- 更少中间写回  
+- 更少布局变换  
+
+## 4. 双缓冲与容量
+
+双缓冲 ≈ 逻辑容量需求上升。  
+先算 **单 buffer 上限**，再决定能不能开双缓冲。
+
+## 5. 检验标准
+
+- [ ] 画出 GEMM 数据流并标指令  
+- [ ] 手算一组 tile 字节  
+- [ ] 解释 valid 与物理容量区别  

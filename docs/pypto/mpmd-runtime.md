@@ -1,37 +1,48 @@
-# MPMD 执行与 simpler 运行时
+# MPMD 执行与 simpler 运行时（深度）
 
-## SPMD vs MPMD
+## 1. SPMD vs MPMD
 
 | | SPMD | MPMD |
 |--|------|------|
-| 程序 | 各核同一入口 | 不同核可跑不同程序/任务 |
-| 典型 | 规则张量切分 | 融合图、多阶段异构任务 |
-| 在 PTO 栈 | pto-isa 手工 kernel 常见 | PyPTO 默认叙事更强调 |
+| 程序 | 同入口，数据不同 | 不同程序/任务 |
+| 典型 | 规则 GEMM 切块 | 融合图、多阶段异构 |
+| 调试 | 相对直观 | 要看任务图 |
 
-PyPTO 把可执行体加载到设备后，由调度器把不同 tile 程序派到 AICPU/AICore 资源上。
+PyPTO 把 MPMD 当默认能力：orchestration 把不同 InCore 派到 AIC/AIV 资源。
 
-## simpler 的位置
+## 2. simpler 是什么
 
-`pypto` 仓库通过 submodule 引入 **simpler** 运行时：
+`pypto` 的 `runtime` submodule 指向 **simpler**：
 
-- 构建并执行 **task dependency graph**  
-- 覆盖 AICPU + AICore  
-- 提供分层 runtime 视角（L2 芯片级 / L1 / L0 核级）——见性能调优文档  
+- 构建/执行 **task dependency graph**  
+- 协同 **AICPU + AICore**  
+- 分层视角：L2 芯片 / L1 / L0（见 simpler 文档 hierarchical level）  
 
-没有 runtime，编译器再强也只是「生成了一堆 kernel 文件」。
+没有它，codegen 只是「生成了许多 kernel 文件」。
 
-## 对性能的含义
+## 3. 调度如何变成性能
 
-1. **Kernel 粒度过细** → AICPU 调度成为顶端瓶颈  
-2. **依赖边过长** → 并行度被串行化  
-3. **cube/vector 拆核** → 额外 hand-off；有时要合并进同一 `pl.at`  
+### 3.1 太碎
 
-这些都不是 ISA 算子微优化能单独解决的，必须在 **图调度层** 处理。
+现象：swimlane 上 AICPU 实心，核空闲。  
+动作：合并 at、内折 range、增大每核工作量。
 
-## 学习建议
+### 3.2 太胖/不均
 
-- 先会写正确的 `pl.function`  
-- 再看一次完整 `build_output/` 目录结构  
-- 然后用 `--enable-l2-swimlane` 把调度「看见」  
+现象：单核长尾。  
+动作：拆分、重切分、负载均衡。
 
-详见：[L2 Swimlane](/perf/l2-swimlane)
+### 3.3 错误依赖
+
+现象：可并行却串行。  
+动作：parallel/spmd、去掉伪依赖。
+
+## 4. 和通信/多卡
+
+MPMD 任务图上挂通信任务时，算通重叠才有「图级」空间；仅靠单 kernel 内双缓冲不够讲清整网。
+
+## 5. 检验标准
+
+- [ ] 解释 simpler 输入输出  
+- [ ] 给出「碎 kernel」的三条改写策略  
+- [ ] 说明 L2 调优为何优先于抠单指令  

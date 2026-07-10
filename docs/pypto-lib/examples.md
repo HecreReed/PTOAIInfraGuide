@@ -1,35 +1,47 @@
-# 从 Hello World 到模型
+# 从 Hello World 到模型（深度路径）
 
-## 推荐爬坡
+## 1. 爬坡表
 
-| 阶段 | 路径 | 学什么 |
-|------|------|--------|
-| 入门 | `examples/beginner/` | 工程骨架、平台参数、最小 tensor op |
-| 进阶 | `examples/intermediate/` | softmax、rms_norm、rope 等单段模式 |
-| 高级 | `examples/advanced/` | 多段融合、指令组合 |
-| 模型 | `models/qwen3/*`、`deepseek/*` | prefill/decode 整链 |
+| 阶段 | 路径 | 学习目标 | 完成标准 |
+|------|------|----------|----------|
+| L0 | beginner/hello_world | 平台参数、harness | sim 绿 |
+| L1 | intermediate/softmax 等 | 单段 at/parallel | 读懂数据流 |
+| L2 | intermediate/rms_norm rope | 融合与 dtype | 改一处不炸 |
+| L3 | advanced/* | 多段+指令组合 | 能画阶段图 |
+| L4 | models/qwen3 decode | 整网编排 | swimlane 能讲 |
+| L5 | deepseek/* | 复杂路由/专家 | 知道风险点 |
 
-## 阅读代码时盯什么
+## 2. 读代码时的批注模板
 
-1. entry 的 `pl.Out` / `pl.InOut`  
-2. `pl.parallel` vs `pl.range`  
-3. `pl.at` 的切分粒度（是否过碎）  
-4. golden_fn 与 kernel 的 dtype/round 是否一致  
-5. 常量 tiling 参数是否写死了目标 shape 假设  
+对每个入口函数记录：
 
-## 最小实验建议
+1. TensorSpec 列表与方向  
+2. 外层 parallel 维  
+3. 每个 `pl.at` 的 name_hint 与大概 op  
+4. 预期 outline 成几个 InCore  
+5. golden_fn 对应关系  
+6. 已知精度阈值  
+
+## 3. 最小对比实验
 
 ```bash
-python examples/beginner/hello_world.py -p a2a3sim
-# 改一个 tile 常量或合并一个 pl.at，再跑
-# 记录：编译是否过、数值是否过、sim 时间变化（仅作相对参考）
+# baseline
+python examples/intermediate/xxx.py -p a2a3sim
+
+# 合并两个 at 后再跑
+# 记录：编译时间、是否数值过、（真机）时延
 ```
 
-## 与 pto-isa kernels 的分工
+## 4. 与 pto-isa manual 对照学
 
-| 资产 | 更偏 |
+| 问题 | 先看 |
 |------|------|
-| pto-isa `kernels/manual` | 指令级极致、教学与后端参考 |
-| pypto-lib | 框架化生产、模型集成、回归体系 |
+| 指令级双缓冲怎么写 | pto-isa gemm_performance |
+| 框架里怎么表达同类事 | pypto-lib + pl.pipeline/at |
+| 整网怎么拼 | models/* |
 
-两者都要看：一个教「刺刀」，一个教「战役」。
+## 5. 检验标准
+
+- [ ] 完成 L0–L2  
+- [ ] 输出一份个人批注（至少 1 个 intermediate）  
+- [ ] 能向同事讲解 decode 主路径阶段  

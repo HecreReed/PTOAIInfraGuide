@@ -1,27 +1,33 @@
-# msprof 与 Profiling
+# msprof 与 Profiling（深度）
 
-## 作用
+## 1. 角色
 
-msprof 是昇腾上定位算子耗时与硬件计数的基础工具（对应 NVIDIA 的 Nsight 家族角色）。pto-isa 学习路径明确建议：上板后用 msprof 看 **CUBE / MTE / Vector Bound**。
+msprof ≈ 昇腾上的「Nsight 家族入口」：看时间线、op 耗时、硬件计数，判断 **CUBE/MTE/VEC** 谁是瓶颈。
 
-## 使用心智
+## 2. 使用协议
 
 1. 固定 shape 与设备  
-2. 采集 timeline / op 统计  
-3. 对照 kernel 阶段假设  
-4. 一次只改一个参数再采  
+2. 固定版本  
+3. 采集  
+4. 对照 kernel 阶段假设  
+5. 只改一个参数再采  
 
-## 和 PTO 术语对齐
+## 3. 解读表
 
-| 你想知道 | 看什么 |
-|----------|--------|
-| 是否在搬数 | MTE 相关占用 |
-| Cube 是否吃饱 | 矩阵单元活跃与气泡 |
-| epilogue 是否过重 | Vector 时长 |
-| 多核是否不均 | 各核耗时分布 |
+| 问题 | 看什么 |
+|------|--------|
+| 是否在搬数 | MTE 相关 |
+| Cube 吃饱吗 | 矩阵单元活跃与气泡 |
+| epilogue | Vector 时长 |
+| 多核不均 | 各核分布 |
 
-## 注意
+## 4. 与 swimlane 分工
 
-- 权限、驱动、CANN 版本要匹配  
-- 采样本身有扰动，看趋势而非绝对小数点  
-- 与 pypto L2 swimlane 互补：msprof 偏硬件计数，swimlane 偏任务调度  
+- msprof：偏硬件  
+- L2 swimlane：偏任务调度  
+二者互补，不可互相替代。
+
+## 5. 检验标准
+
+- [ ] 完成一次采集并写出 Bound 结论  
+- [ ] 说明采样扰动  

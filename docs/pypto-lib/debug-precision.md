@@ -1,41 +1,47 @@
-# 调试与精度对齐
+# 调试与精度对齐（深度）
 
-## 调试入口
+## 1. 调试武器库
 
-官方文档：`docs/debugging.md`（仓库内）。常见手段：
-
-- 读 pypto / ptoas 报错信息（先修编译）  
-- `golden_data` 重放失败输入  
-- `runtime_dir` 复用编译产物  
-- device log 查挂死  
-- dump-tensor / dep-gen 等 DFX 开关  
-
-## 精度调优清单
-
-来自 `docs/precision-tuning.md` 的工程要点：
-
-1. **`pl.cast` 舍入模式** 与 torch 参考一致  
-2. kernel 与 golden 的中间 dtype 对齐  
-3. 量化方案两端一致  
-4. `error_distribution` 阈值扫描，区分「偶发尖峰」与「系统偏差」  
-5. 真实权重测试，不只看随机输入  
-
-## 典型坑
-
-| 现象 | 排查 |
+| 手段 | 用途 |
 |------|------|
-| 全 0 输出 | Out 方向、是否真的 store、错误 device |
-| 仅尾部错误 | valid/尾块 tiling |
-| 全盘微小偏差 | bf16/fp16 累加顺序、online softmax 实现差 |
-| 大偏差 | 错 kernel、错 stride、漏 dequant |
+| 读 pypto/ptoas 报错 | 编译期问题 |
+| `golden_data` 重放 | 固定失败输入 |
+| `runtime_dir` 复用编译 | 加速迭代 |
+| device log | hang/同步 |
+| dump-tensor / dep-gen | 中间值与依赖 DFX |
+| `dump_passes` | IR 演变 |
 
-## 建议流程
+详见上游 `docs/debugging.md`。
+
+## 2. 精度工作流
+
+来自 `precision-tuning.md` 的工程顺序：
+
+1. **cast 舍入** 与 torch 对齐  
+2. 中间 dtype 对齐  
+3. 量化方案两端一致  
+4. `error_distribution` 扫描阈值  
+5. 真实权重回归，而不仅随机输入  
+
+## 3. 故障树
 
 ```text
-sim 上 golden 严格过关
-  → 真机同阈值
-  → 再开性能优化
-  → 每次优化后回归精度表
+数值失败
+├─ 全 0 → Out 方向 / 未 store / 错 device
+├─ 仅尾部 → valid / 尾块 tiling
+├─ 全体小偏 → bf16 累加序 / online softmax 实现差
+├─ 局部爆炸 → 溢出、缺 dequant、错 scale
+└─ 偶发 → 未初始化、竞态（真机 sync）
 ```
 
-性能优化若不管精度，最后只是「跑得快的错误答案」。
+## 4. 建议门禁
+
+- sim 严格阈值先过  
+- 真机同阈值  
+- 优化提交必须附：精度表 + 性能表  
+
+## 5. 检验标准
+
+- [ ] 独立用重放定位一次失败  
+- [ ] 列出 5 条精度检查项  
+- [ ] 解释为何随机输入不够  

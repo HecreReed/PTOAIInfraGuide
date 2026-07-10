@@ -1,50 +1,78 @@
-# 多级 IR 与编译流程
+# 多级 IR 与编译流程（深度）
 
-## 编译阶段（概念）
+## 1. 端到端大图
 
 ```text
-用户 Python（Tensor API / pl.function）
-        ↓
+Python 源（@pl.jit / @pl.program）
+        ↓ 前端解析 / 类型
 Tensor Graph
-        ↓ Pass 族
+        ↓ Pass 族（tiling、算子分解…）
 Tile Graph
         ↓
 Block Graph
         ↓
-Execution Graph / 可调度形态
+Execution / 可调度形态
+        ↓ outlining
+Orchestration + 多个 InCore 函数
         ↓ Codegen
-.pto（PTO MLIR 文本）
-        ↓ ptoas
-AIC/AIV C++ kernels + 编排信息
-        ↓ runtime (simpler)
-NPU 执行
+.pto 文本（每 InCore 一份或一组）
+        ↓ ptoas（可线程池并行）
+C++ kernel wrappers（aic/ / aiv/）
+        ↓ 设备编译链接
+可加载二进制
+        ↓ simpler runtime
+NPU 执行 + 可选 DFX
 ```
 
-## 与 pypto-lib 实测路径对齐
+## 2. 与 pypto-lib golden 路径对齐
 
-运行 `python kernel.py -p a2a3` 时，golden harness 会：
+`python kernel.py -p a2a3` 实际：
 
-1. **Compile**：程序变换，outline 出 Orchestration + 多个 InCore  
-2. **Codegen**：InCore → `.pto` → `ptoas` → `kernels/aic|aiv`  
-3. **准备输入 / golden**  
-4. **Runtime** 加载执行  
-5. **Compare** rtol/atol  
+1. **Compile**：程序变换，`dump_passes` 可留中间  
+2. **Codegen**：调 PTO backend → 写 `ptoas/` 与 `kernels/`  
+3. **Input/Golden**：按 TensorSpec 生成；torch 参考  
+4. **Runtime**：platform/device  
+5. **Compare**：rtol/atol，失败非 0  
 
-`dump_passes=True` 时保留中间产物，是学编译器行为的最佳教材。
+这是把「编译器课」和「算子课」接在一起的最佳实验床。
 
-## Outline 规则（直觉）
+## 3. Outline 规则（性能关键）
 
-- 每个 `pl.at(CORE_GROUP)` 区域倾向变成 InCore 函数  
-- 混合 cube + vector 的区域可能被拆成 **cube-only + vector-only** 两个 kernel  
-- 最终通常：**1 个 Orchestration + N 个 InCore**
+观察来自 pypto-lib 文档的工程事实：
 
-这解释了性能文档里「相邻 `pl.at` 太碎会让 AICPU 调度成为瓶颈」。
+- 每个 `pl.at(CORE_GROUP)` 倾向变成 **独立 InCore**  
+- 同一 at 内混 cube+vector → 可能 **拆成两个 InCore**（cube-only + vector-only）  
+- 终点稳定态：  
+  - **恰好 1 个 Orchestration**  
+  - **N 个 InCore**  
 
-## 调试分层
+### 3.1 对性能的直接推论
 
-| 症状 | 先查哪一层 |
-|------|------------|
-| 编译报错 / 非法 op | 前端类型与 shape、IR verifier |
-| 生成代码离谱 | dump `.pto` 与 ptoas 日志 |
-| 数值不对 | golden 对齐、cast 模式、In/Out 方向 |
-| 很慢但正确 | swimlane 与 tiling，而非先怀疑 ISA 实现 |
+| 写法 | 后果 |
+|------|------|
+| 很多小 `pl.at` | 很多 kernel + AICPU 调度压力 |
+| 该合并的 matmul+epilogue 拆开 | 额外 hand-off |
+| 外层 `pl.range` 本可 parallel | 人为串行长链 |
+
+## 4. Codegen 与 PTOAS 交互
+
+- 环境：`$PTOAS_ROOT/ptoas` 或 PATH  
+- `skip_ptoas=True`：只留 `.pto`（编译器开发有用）  
+- 失败时：先看 `.pto` 是否非法，再看 ptoas 日志  
+
+## 5. 调试分层表
+
+| 阶段 | 信号 | 动作 |
+|------|------|------|
+| 前端 | Python 异常、类型错 | 查注解、Out 方向 |
+| IR | verifier | dump passes |
+| ptoas | 同步/内存 | 降 level、对照 lit |
+| 链接/设备 | 驱动/CANN | soc/platform |
+| 数值 | golden | 精度文档 |
+| 性能 | swimlane | 合并/切分 |
+
+## 6. 检验标准
+
+- [ ] 默写端到端 8 步  
+- [ ] 解释为何「两个相邻 at」可能变两个 kernel  
+- [ ] 会用 dump 定位「多出来的 tmov」来自哪层  

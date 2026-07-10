@@ -1,9 +1,7 @@
 # 性能分析 · 模块总览
 
-## 文章
+本模块已按 AIInfraGuide 粒度扩写，建议按下列顺序阅读：
 
-| 文章 | 内容 |
-|------|------|
-| [msprof 与 Profiling](./msprof) | 传统 NPU profiling |
-| [L2 Swimlane](./l2-swimlane) | 核间调度可视化 |
-| [CostModel](./costmodel) | 性能仿真 |
+- [msprof](./msprof)
+- [l2-swimlane](./l2-swimlane)
+- [costmodel](./costmodel)
